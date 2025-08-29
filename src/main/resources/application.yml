@@ -1,0 +1,19 @@
+app:
+  jwt:
+    secret: "YOUR_LONG_RANDOM_64+_CHAR_SECRET"
+    expirationMinutes: 60
+    issuer: "orienteering-app"
+
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/orienteering
+    username: postgres
+    password: 195@Postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
