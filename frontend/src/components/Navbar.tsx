@@ -18,6 +18,7 @@ export default function Navbar() {
         const me = await api.get<{ email: string }>("/api/auth/me");
         if (!cancelled) setEmail(me.email);
       } catch {
+        // If /auth/me fails (e.g., token expired), just show signed-out UI.
         if (!cancelled) setEmail(null);
       }
     })();
@@ -29,15 +30,13 @@ export default function Navbar() {
   return (
     <nav style={{ display: "flex", gap: 12 }}>
       <Link to="/">Home</Link>
-
-      {/* Match the paths actually defined in main.tsx */}
-      <Link to="/public">Public</Link>
+      {/* Public list */}
+      <Link to="/routes">Public</Link>
 
       {email ? (
         <>
-          {/* Protected “My routes” is /mine (not /routes/mine) */}
-          <Link to="/mine">My routes</Link>
-
+          {/* Protected list of the current user's routes */}
+          <Link to="/routes/mine">My routes</Link>
           <Link to="/create">Create</Link>
           <span>Hi, {email}</span>
           <button

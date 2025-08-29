@@ -10,10 +10,16 @@ public class RouteRes {
     private boolean isPublic;
     private Instant createdAt;
 
-    // Include geometry as WKT
+    /** WKT of the geometry (may be null if viewer not allowed or route has no geom) */
     private String geomWkt;
 
-    // Optional – keep if you use checkpoints elsewhere
+    /** Owner's username/email (useful for debugging/UI, optional to show) */
+    private String ownerUsername;
+
+    /** Whether the current viewer can edit/delete this route */
+    private boolean canEdit;
+
+    // (keep if you use them)
     private List<CheckpointDto> checkpoints;
 
     // --- getters / setters ---
@@ -34,6 +40,12 @@ public class RouteRes {
 
     public String getGeomWkt() { return geomWkt; }
     public void setGeomWkt(String geomWkt) { this.geomWkt = geomWkt; }
+
+    public String getOwnerUsername() { return ownerUsername; }
+    public void setOwnerUsername(String ownerUsername) { this.ownerUsername = ownerUsername; }
+
+    public boolean isCanEdit() { return canEdit; }
+    public void setCanEdit(boolean canEdit) { this.canEdit = canEdit; }
 
     public List<CheckpointDto> getCheckpoints() { return checkpoints; }
     public void setCheckpoints(List<CheckpointDto> checkpoints) { this.checkpoints = checkpoints; }

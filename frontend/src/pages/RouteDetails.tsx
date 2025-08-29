@@ -1,101 +1,150 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
 
-type RouteItem = {
+type RouteRes = {
   id: number;
   name: string;
-  distanceMeters: number;
-  isPublic?: boolean;  // tolerate both shapes
-  public?: boolean;    // (backend @JsonProperty("public"))
-  geomWkt?: string | null;
+  distanceMeters: number | null;
+  public: boolean;
+  geomWkt: string | null;
+  ownerUsername?: string | null;
+  canEdit?: boolean;
 };
-
-function toLatLngs(wkt?: string | null): [number, number][] | null {
-  if (!wkt) return null;
-  const m = wkt.trim().match(/^LINESTRING\s*\((.+)\)$/i);
-  if (!m) return null;
-  try {
-    return m[1].split(",").map(s => {
-      const [xStr, yStr] = s.trim().split(/\s+/);
-      const lon = Number(xStr), lat = Number(yStr);
-      return [lat, lon] as [number, number];
-    });
-  } catch { return null; }
-}
 
 export default function RouteDetails() {
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
+  const navigate = useNavigate();
 
-  // optimistic summary from navigation state (may not include geom)
-  const seeded = (location.state as any)?.route as RouteItem | undefined;
-
-  const [route, setRoute] = useState<RouteItem | undefined>(seeded);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<RouteRes | null>(null);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // edit state
+  const [edit, setEdit] = useState(false);
+  const [name, setName] = useState("");
+  const [distance, setDistance] = useState<number | "">("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [wkt, setWkt] = useState("");
+
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!id) return;
-      setLoading(true);
-      setErr(null);
+    (async () => {
       try {
-        const full = await api.get<RouteItem>(`/api/routes/${id}`);
-        if (!cancelled) setRoute(full);
+        setLoading(true);
+        const r = await api.get<RouteRes>(`/api/routes/${id}`);
+        setData(r);
+        // seed edit form
+        setName(r.name ?? "");
+        setDistance(r.distanceMeters ?? "");
+        setIsPublic(!!r.public);
+        setWkt(r.geomWkt ?? "");
+        setErr(null);
       } catch (e: any) {
-        if (!cancelled) setErr(e?.body || e?.message || "Failed to load");
+        setErr(e?.body || e?.message || "Failed to load");
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    }
-    load();
-    return () => { cancelled = true; };
+    })();
   }, [id]);
 
-  const latlngs = useMemo(() => toLatLngs(route?.geomWkt), [route?.geomWkt]);
-  const isPublic = (route?.isPublic ?? route?.public) === true;
+  const canEdit = !!data?.canEdit;
+
+  async function onSave() {
+    try {
+      const body: any = {
+        name,
+        distanceMeters: typeof distance === "number" ? distance : null,
+        public: isPublic,
+        geomWkt: wkt,
+      };
+      const updated = await api.put<RouteRes>(`/api/routes/${id}`, body);
+      setData(updated);
+      setEdit(false);
+      setErr(null);
+    } catch (e: any) {
+      setErr(e?.body || e?.message || "Update failed");
+    }
+  }
+
+  async function onDelete() {
+    if (!confirm("Delete this route permanently?")) return;
+    try {
+      await api.delete<void>(`/api/routes/${id}`);
+      navigate("/routes/mine");
+    } catch (e: any) {
+      setErr(e?.body || e?.message || "Delete failed");
+    }
+  }
+
+  const distanceLabel = useMemo(() => {
+    if (data?.distanceMeters == null) return "—";
+    return `${data.distanceMeters} m`;
+  }, [data]);
 
   return (
-    <>
-      <p><Link to="..">← Back</Link></p>
+    <div style={{ padding: 16, display: "grid", gap: 12 }}>
+      <Link to={canEdit ? "/routes/mine" : "/routes"}>← Back</Link>
+      <h2>Route — {data?.name || "(unknown)"}</h2>
 
-      <h1>Route — {route?.name ?? "(unknown)"}</h1>
-      <p>
-        <strong>Distance:</strong>{" "}
-        {route?.distanceMeters != null ? `${route.distanceMeters} m` : "—"}{" "}
-        {isPublic ? "(public)" : "(private)"}
-      </p>
-      <p><strong>ID:</strong> {id}</p>
+      {loading && <div>Loading…</div>}
+      {err && <div style={{ color: "crimson" }}>{err}</div>}
 
-      <h3>Geometry (WKT)</h3>
-      {!route?.geomWkt ? (
-        <p style={{ color: "#999" }}>(empty)</p>
-      ) : (
-        <code>{route.geomWkt}</code>
+      {data && (
+        <>
+          <div>
+            <strong>Distance:</strong> {distanceLabel} {data.public ? "(public)" : "(private)"}
+          </div>
+          <div><strong>ID:</strong> {data.id}</div>
+
+          <h3>Geometry (WKT)</h3>
+          <pre style={{ background: "#f6f6f6", padding: 8 }}>
+            {data.geomWkt ?? "(empty)"}
+          </pre>
+
+          {canEdit && !edit && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setEdit(true)}>Edit</button>
+              <button onClick={onDelete} style={{ color: "white", background: "crimson" }}>
+                Delete
+              </button>
+            </div>
+          )}
+
+          {canEdit && edit && (
+            <div style={{ display: "grid", gap: 10, maxWidth: 720 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span>Name</span>
+                <input value={name} onChange={e => setName(e.target.value)} />
+              </label>
+
+              <label style={{ display: "grid", gap: 4 }}>
+                <span>Distance (m)</span>
+                <input
+                  type="number"
+                  value={distance}
+                  min={0}
+                  onChange={(e) => setDistance(e.target.value === "" ? "" : Number(e.target.value))}
+                />
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+                Public
+              </label>
+
+              <label style={{ display: "grid", gap: 4 }}>
+                <span>Geometry (WKT)</span>
+                <textarea rows={5} value={wkt} onChange={e => setWkt(e.target.value)} />
+              </label>
+
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={onSave}>Save</button>
+                <button onClick={() => setEdit(false)}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </>
       )}
-
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
-      {loading && <p>Loading…</p>}
-
-      {latlngs ? (
-        <div style={{ height: 420, marginTop: 12 }}>
-          <MapContainer center={latlngs[0]} zoom={14} style={{ height: "100%", width: "100%" }}>
-            <TileLayer
-              attribution='&copy; OpenStreetMap contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <Polyline positions={latlngs} />
-            <Marker position={latlngs[0]}><Popup>Start</Popup></Marker>
-            <Marker position={latlngs[latlngs.length - 1]}><Popup>Finish</Popup></Marker>
-          </MapContainer>
-        </div>
-      ) : (
-        !!route && <p style={{ color: "#999" }}>No geometry available in this response.</p>
-      )}
-    </>
+    </div>
   );
 }

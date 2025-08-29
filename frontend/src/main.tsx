@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, Navigate } from "react-router-dom";
 import "./index.css";
 
 import Navbar from "./components/Navbar";
@@ -33,24 +33,32 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
+      // Home
       { index: true, element: <Home /> },
 
-      // Public list is at /public
-      { path: "public", element: <PublicRoutes /> },
+      // Public list is at /routes
+      { path: "routes", element: <PublicRoutes /> },
 
-      // Protected pages:
+      // Protected pages
       {
         element: <RequireAuth />,
         children: [
-          // My routes are at /mine
-          { path: "mine", element: <Mine /> },
+          { path: "routes/mine", element: <Mine /> },
           { path: "create", element: <CreateRoute /> },
         ],
       },
 
-      // Details lives at /routes/:id (this stays)
+      // Route details
       { path: "routes/:id", element: <RouteDetails /> },
 
+      // Auth
+      { path: "login", element: <Login /> },
+
+      // --- Optional back-compat redirects (old paths) ---
+      { path: "public", element: <Navigate to="/routes" replace /> },
+      { path: "mine", element: <Navigate to="/routes/mine" replace /> },
+
+      // 404
       { path: "*", element: <div style={{ padding: 16 }}>Not found.</div> },
     ],
   },

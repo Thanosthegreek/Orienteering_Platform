@@ -1,20 +1,20 @@
+// src/main/java/com/orienteering/web/RouteController.java
 package com.orienteering.web;
 
+import com.orienteering.dto.RouteCreateReq;
 import com.orienteering.dto.RouteRes;
 import com.orienteering.dto.RouteUpdateReq;
-import com.orienteering.dto.RouteCreateReq;
 import com.orienteering.service.RouteService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/routes")
 public class RouteController {
 
     private final RouteService routeService;
@@ -23,54 +23,49 @@ public class RouteController {
         this.routeService = routeService;
     }
 
-    // ---------- PUBLIC LIST ----------
-    // GET /api/routes?page=0&size=20
-    @GetMapping(value = "/routes", produces = "application/json")
-    public Page<RouteRes> list(
-            @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "20") int size) {
+    /** Create route (requires auth) */
+    @PostMapping
+    public RouteRes create(@Valid @RequestBody RouteCreateReq req, Authentication auth) {
+        // Prefer email/username from the authenticated principal
+        String user = auth != null ? auth.getName() : null;
+        return routeService.create(user, req);
+    }
 
-        Pageable pageable = PageRequest.of(page, size);
+    /** List public routes (no auth required) */
+    @GetMapping
+    public Page<RouteRes> listPublic(Pageable pageable) {
         return routeService.listPublic(pageable);
     }
 
-    // ---------- MY ROUTES (AUTH) ----------
-    // GET /api/routes/mine
-    @GetMapping("/routes/mine")
+    /** List my routes (requires auth) */
+    @GetMapping("/mine")
     public List<RouteRes> mine(Authentication auth) {
-        final String username = auth.getName(); // email/username from JWT
-        return routeService.mine(username);
+        String user = auth != null ? auth.getName() : null;
+        return routeService.mine(user);
     }
 
-    // ---------- DETAILS (PUBLIC) ----------
-    // GET /api/routes/{id}
-    // NOTE: id is numeric; "/routes/mine" is handled by the method above
-    @GetMapping("/routes/{id}")
-    public ResponseEntity<RouteRes> details(
+    /** Route details for viewer (id is explicit) */
+    @GetMapping("/{id}")
+    public RouteRes details(@PathVariable("id") Long id, Authentication auth) {
+        String viewer = auth != null ? auth.getName() : null;
+        return routeService.getForViewer(id, viewer);
+    }
+
+    /** Update route (requires auth) */
+    @PutMapping("/{id}")
+    public RouteRes update(
             @PathVariable("id") Long id,
-            Authentication auth) {
-
-        final String viewer = (auth != null) ? auth.getName() : null;
-        return ResponseEntity.ok(routeService.getForViewer(id, viewer));
+            @Valid @RequestBody RouteUpdateReq req,
+            Authentication auth
+    ) {
+        String user = auth != null ? auth.getName() : null;
+        return routeService.update(id, req, user);
     }
 
-    // ---------- CREATE (AUTH) ----------
-    @PostMapping("/routes")
-    public ResponseEntity<RouteRes> create(@RequestBody RouteCreateReq req, Authentication auth) {
-        final String username = auth.getName();
-        return ResponseEntity.ok(routeService.create(username, req));
-    }
-
-    // ---------- UPDATE (AUTH) ----------
-    @PutMapping("/routes/{id}")
-    public ResponseEntity<RouteRes> update(@PathVariable Long id, @RequestBody RouteUpdateReq req) {
-        return ResponseEntity.ok(routeService.update(id, req));
-    }
-
-    // ---------- DELETE (AUTH) ----------
-    @DeleteMapping("/routes/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        routeService.delete(id);
-        return ResponseEntity.noContent().build();
+    /** Delete route (requires auth) */
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable("id") Long id, Authentication auth) {
+        String user = auth != null ? auth.getName() : null;
+        routeService.delete(id, user);
     }
 }
