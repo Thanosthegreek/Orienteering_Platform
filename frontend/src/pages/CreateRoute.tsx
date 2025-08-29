@@ -1,6 +1,6 @@
 // frontend/src/pages/CreateRoute.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "../lib/api";
@@ -137,7 +137,6 @@ export default function CreateRoute() {
       push({ variant: "success", title: "Created", message: "Route created successfully." });
       navigate(`/routes/${res.id}`);
     } catch (err: any) {
-      // try to surface server field errors if present
       try {
         const obj = JSON.parse(err?.body || "{}");
         const fe: FieldErrors = {};
@@ -147,13 +146,10 @@ export default function CreateRoute() {
         if (Object.keys(fe).length) {
           setFieldErrs(fe);
         } else {
-          push({
-            variant: "error",
-            title: "Create failed",
-            message: String(err?.body || err?.message || "Unknown error"),
-          });
+          throw err;
         }
       } catch {
+        // fallback toast
         push({
           variant: "error",
           title: "Create failed",
@@ -167,6 +163,10 @@ export default function CreateRoute() {
 
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
+      <div className="btn-row">
+        <Link to="/routes/mine" className="btn btn-ghost">← Back</Link>
+      </div>
+
       <h2>Create route</h2>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, maxWidth: 760 }}>
@@ -176,7 +176,7 @@ export default function CreateRoute() {
             value={name}
             onChange={e => setName(e.target.value)}
             placeholder="Morning Loop"
-            style={{ padding: 8, borderColor: fieldErrs.name ? "crimson" : undefined }}
+            style={{ borderColor: fieldErrs.name ? "crimson" : undefined }}
           />
           {fieldErrs.name && <small style={{ color: "crimson" }}>{fieldErrs.name}</small>}
         </label>
@@ -189,8 +189,8 @@ export default function CreateRoute() {
               value={distanceMeters}
               onChange={e => setDistanceMeters(e.target.value === "" ? "" : Number(e.target.value))}
               placeholder={estimate ? String(estimate) : "e.g. 1200"}
-              style={{ padding: 8, borderColor: fieldErrs.distanceMeters ? "crimson" : undefined }}
               min={0}
+              style={{ borderColor: fieldErrs.distanceMeters ? "crimson" : undefined }}
             />
             {fieldErrs.distanceMeters && (
               <small style={{ color: "crimson" }}>{fieldErrs.distanceMeters}</small>
@@ -208,9 +208,14 @@ export default function CreateRoute() {
         </div>
 
         {path.length >= 2 && (
-          <div>
-            Estimated distance: <strong>{estimate} m</strong>{" "}
-            <button type="button" onClick={() => setDistanceMeters(estimate)} style={{ marginLeft: 8 }}>
+          <div className="route-meta" style={{ marginTop: -6 }}>
+            Estimated distance: <strong>{estimate} m</strong>
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setDistanceMeters(estimate)}
+              style={{ marginLeft: 8 }}
+            >
               Use estimate
             </button>
           </div>
@@ -223,22 +228,25 @@ export default function CreateRoute() {
             onChange={e => setWktInput(e.target.value)}
             placeholder="LINESTRING(23.721 37.983, 23.723 37.985)"
             rows={5}
-            style={{ padding: 8, fontFamily: "monospace", borderColor: fieldErrs.geomWkt ? "crimson" : undefined }}
+            style={{ fontFamily: "monospace", borderColor: fieldErrs.geomWkt ? "crimson" : undefined }}
           />
           {(fieldErrs.geomWkt || parseError) && (
             <small style={{ color: "crimson" }}>{fieldErrs.geomWkt || parseError}</small>
           )}
         </label>
 
-        <button type="submit" disabled={saving}>
-          {saving ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-              <Spinner /> Creating…
-            </span>
-          ) : (
-            "Create"
-          )}
-        </button>
+        <div className="btn-row">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Spinner /> Creating…
+              </span>
+            ) : (
+              "Create"
+            )}
+          </button>
+          <Link to="/routes/mine" className="btn">Cancel</Link>
+        </div>
       </form>
 
       {/* Map preview */}

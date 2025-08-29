@@ -1,64 +1,130 @@
+// frontend/src/pages/Login.tsx
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { setToken } from "../lib/auth";
 import { useToast } from "../components/Toasts";
 import { Spinner } from "../components/Loading";
 
-export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type FieldErrors = {
+  email?: string;
+  password?: string;
+};
 
-  const nav = useNavigate();
+export default function Login() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { push } = useToast();
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-    if (!email.trim() || !password) {
-      setError("Email and password are required.");
-      return;
+  const [saving, setSaving] = useState(false);
+  const [fieldErrs, setFieldErrs] = useState<FieldErrors>({});
+  const [serverErr, setServerErr] = useState<string | null>(null);
+  const [showPwd, setShowPwd] = useState(false);
+
+  const from = (location.state as any)?.from || "/routes/mine";
+
+  function validate(): boolean {
+    const e: FieldErrors = {};
+    if (!email.trim()) e.email = "Email is required.";
+    if (!password) e.password = "Password is required.";
+    setFieldErrs(e);
+    return Object.keys(e).length === 0;
     }
 
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setServerErr(null);
+    if (!validate()) return;
+
     try {
-      setSubmitting(true);
-      const res = await api.post<{ token: string }>("/api/auth/login", { email: email.trim(), password });
+      setSaving(true);
+      const res = await api.post<{ token: string }>("/api/auth/login", {
+        email: email.trim(),
+        password,
+      });
       setToken(res.token);
-      push({ variant: "success", title: "Welcome!", message: "Login successful." });
-      const next = (location.state as any)?.from || "/routes/mine";
-      nav(next, { replace: true });
+      push({ variant: "success", title: "Welcome back!", message: "Logged in successfully." });
+
+      // go where user intended or fallback
+      navigate(from, { replace: true });
     } catch (err: any) {
-      const msg = err?.body || err?.message || "Login failed.";
-      setError(typeof msg === "string" ? msg : "Login failed.");
-      push({ variant: "error", title: "Login failed", message: String(msg) });
+      // try to surface server-provided message
+      let msg = String(err?.body || err?.message || "Login failed");
+      try {
+        const parsed = JSON.parse(err?.body || "{}");
+        if (parsed?.error) msg = String(parsed.error);
+        if (parsed?.message) msg = String(parsed.message);
+      } catch {}
+      setServerErr(msg);
+      push({ variant: "error", title: "Login failed", message: msg });
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "40px auto", display: "grid", gap: 12 }}>
-      <h2>Login</h2>
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+    <div style={{ padding: 16, display: "grid", gap: 16, maxWidth: 420 }}>
+      <h2>Sign in</h2>
+
+      {serverErr && (
+        <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{serverErr}</div>
+      )}
+
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
         <label style={{ display: "grid", gap: 4 }}>
           <span>Email</span>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            style={{ borderColor: fieldErrs.email ? "crimson" : undefined }}
+          />
+          {fieldErrs.email && <small style={{ color: "crimson" }}>{fieldErrs.email}</small>}
         </label>
+
         <label style={{ display: "grid", gap: 4 }}>
           <span>Password</span>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type={showPwd ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              style={{ flex: 1, borderColor: fieldErrs.password ? "crimson" : undefined }}
+            />
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setShowPwd(v => !v)}
+              title={showPwd ? "Hide password" : "Show password"}
+            >
+              {showPwd ? "Hide" : "Show"}
+            </button>
+          </div>
+          {fieldErrs.password && <small style={{ color: "crimson" }}>{fieldErrs.password}</small>}
         </label>
 
-        {error && <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{error}</div>}
-
-        <button type="submit" disabled={submitting} style={{ padding: "8px 12px" }}>
-          {submitting ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Spinner /> Signing in…</span> : "Login"}
-        </button>
+        <div className="btn-row" style={{ marginTop: 4 }}>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            {saving ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Spinner /> Signing in…
+              </span>
+            ) : (
+              "Sign in"
+            )}
+          </button>
+          <Link to="/routes" className="btn">Cancel</Link>
+        </div>
       </form>
+
+      <div style={{ color: "#6b7280", fontSize: ".9rem" }}>
+        Don’t have an account? You can still explore <Link to="/routes">public routes</Link>.
+      </div>
     </div>
   );
 }

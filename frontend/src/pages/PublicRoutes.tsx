@@ -1,7 +1,7 @@
+// frontend/src/pages/PublicRoutes.tsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { useToast } from "../components/Toasts";
 import { Skeleton } from "../components/Loading";
 
 type RouteItem = {
@@ -12,50 +12,55 @@ type RouteItem = {
 };
 
 export default function PublicRoutes() {
-  const [items, setItems] = useState<RouteItem[] | null>(null); // null = loading
+  const [items, setItems] = useState<RouteItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const { push } = useToast();
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get<any>("/api/routes");
-        const list: RouteItem[] = Array.isArray(res)
-          ? res
-          : Array.isArray(res?.content)
-          ? res.content
-          : [];
-        setItems(list);
+        setLoading(true);
+        const page = await api.get<{ content: RouteItem[] }>("/api/routes");
+        setItems(Array.isArray(page?.content) ? page.content : []);
       } catch (e: any) {
-        const msg = e?.body || e?.message || "Failed to load public routes.";
-        setErr(typeof msg === "string" ? msg : "Failed to load public routes.");
-        push({ variant: "error", title: "Load failed", message: String(msg) });
-        setItems([]); // avoid spinner forever
+        setErr(e?.body || e?.message || "Failed to load");
+      } finally {
+        setLoading(false);
       }
     })();
-  }, [push]);
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ padding: 16 }}>
+        <h2>Public routes</h2>
+        <Skeleton height={48} />
+        <Skeleton height={48} />
+        <Skeleton height={48} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16 }}>
       <h2>Public routes</h2>
-
-      {items === null ? (
-        // loading skeletons
-        <div style={{ display: "grid", gap: 10, maxWidth: 700 }}>
-          <Skeleton height={18} width="45%" />
-          <Skeleton height={14} />
-          <Skeleton height={14} width="80%" />
-          <Skeleton height={14} width="65%" />
-          <Skeleton height={14} width="50%" />
-        </div>
-      ) : items.length === 0 ? (
-        <p style={{ color: "#777" }}>{err ? err : "(none yet)"}</p>
+      {err && <div style={{ color: "crimson" }}>{err}</div>}
+      {!items.length ? (
+        <p style={{ color: "#777" }}>(none)</p>
       ) : (
-        <ul>
-          {items.map((r) => (
-            <li key={r.id}>
-              <Link to={`/routes/${r.id}`}>{r.name}</Link>{" "}
-              — {r.distanceMeters ?? "—"} m {r.public ? "(public)" : "(private)"}
+        <ul className="route-list">
+          {items.map(r => (
+            <li key={r.id} className="route-item">
+              <div style={{ display: "grid", gap: 2 }}>
+                <Link to={`/routes/${r.id}`} style={{ fontWeight: 600 }}>
+                  {r.name}
+                </Link>
+                <div className="route-meta">
+                  <span>{r.distanceMeters ?? "—"} m</span>
+                  <span className="tag tag-green">public</span>
+                </div>
+              </div>
+              <Link className="btn btn-sm" to={`/routes/${r.id}`}>Open</Link>
             </li>
           ))}
         </ul>

@@ -1,6 +1,6 @@
 // frontend/src/pages/RouteDetails.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
 import { useToast } from "../components/Toasts";
 import { Skeleton, Spinner } from "../components/Loading";
@@ -24,6 +24,7 @@ type FieldErrors = {
 
 export default function RouteDetails() {
   const { id } = useParams<{ id: string }>();
+  const { state } = useLocation();
   const navigate = useNavigate();
   const { push } = useToast();
 
@@ -32,7 +33,7 @@ export default function RouteDetails() {
   const [err, setErr] = useState<string | null>(null);
 
   // edit state
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState<boolean>(!!(state as any)?.edit);
   const [name, setName] = useState("");
   const [distance, setDistance] = useState<number | "">("");
   const [isPublic, setIsPublic] = useState(true);
@@ -66,9 +67,7 @@ export default function RouteDetails() {
   function validate(): boolean {
     const next: FieldErrors = {};
     if (!name.trim()) next.name = "Name is required.";
-    if (distance !== "" && typeof distance === "number" && distance < 0) {
-      next.distanceMeters = "Distance must be ≥ 0.";
-    }
+    if (distance !== "" && typeof distance === "number" && distance < 0) next.distanceMeters = "Distance must be ≥ 0.";
     setFieldErrs(next);
     return Object.keys(next).length === 0;
   }
@@ -85,9 +84,7 @@ export default function RouteDetails() {
         if (src.geomWkt) fe.geomWkt = String(src.geomWkt);
         return Object.keys(fe).length ? fe : null;
       }
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     return null;
   }
 
@@ -111,11 +108,7 @@ export default function RouteDetails() {
       if (fe) {
         setFieldErrs(fe);
       } else {
-        push({
-          variant: "error",
-          title: "Update failed",
-          message: String(e?.body || e?.message || "Unknown error"),
-        });
+        push({ variant: "error", title: "Update failed", message: String(e?.body || e?.message || "Unknown error") });
       }
     } finally {
       setSaving(false);
@@ -125,18 +118,10 @@ export default function RouteDetails() {
   async function confirmDelete() {
     try {
       await api.delete<void>(`/api/routes/${id}`);
-      push({
-        variant: "success",
-        title: "Deleted",
-        message: `Route "${data?.name ?? id}" deleted.`,
-      });
+      push({ variant: "success", title: "Deleted", message: `Route "${data?.name ?? id}" deleted.` });
       navigate("/routes/mine");
     } catch (e: any) {
-      push({
-        variant: "error",
-        title: "Delete failed",
-        message: String(e?.body || e?.message || "Unknown error"),
-      });
+      push({ variant: "error", title: "Delete failed", message: String(e?.body || e?.message || "Unknown error") });
     } finally {
       setAskDelete(false);
     }
@@ -159,7 +144,7 @@ export default function RouteDetails() {
 
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
-      <Link to={canEdit ? "/routes/mine" : "/routes"}>← Back</Link>
+      <Link to={canEdit ? "/routes/mine" : "/routes"} className="btn btn-ghost">← Back</Link>
 
       {loading ? (
         <>
@@ -172,64 +157,52 @@ export default function RouteDetails() {
         <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{err}</div>
       ) : data ? (
         <>
-          <h2>Route — {data.name || "(unknown)"}</h2>
-          <div>
-            <strong>Distance:</strong> {distanceLabel}{" "}
-            {data.public ? "(public)" : "(private)"}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <h2 style={{ margin: 0 }}>Route — {data.name || "(unknown)"}</h2>
+            <span className={`tag ${data.public ? "tag-green" : "tag-gray"}`}>
+              {data.public ? "public" : "private"}
+            </span>
           </div>
-          <div>
+
+          <div className="route-meta" style={{ marginTop: 2 }}>
+            <strong>Distance:</strong> {distanceLabel}
+            <span style={{ opacity: 0.5 }}>•</span>
             <strong>ID:</strong> {data.id}
           </div>
 
-          {/* VIEW MODE */}
-          {!edit && (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <h3 style={{ margin: 0 }}>Geometry (WKT)</h3>
-                {data.geomWkt && (
-                  <button
-                    onClick={onCopyWkt}
-                    title="Copy WKT"
-                    style={{ padding: "4px 8px", fontSize: 12, cursor: "pointer" }}
-                  >
-                    Copy
-                  </button>
-                )}
-              </div>
-              <pre style={{ background: "#f6f6f6", padding: 8 }}>
-                {data.geomWkt ?? "(empty)"}
-              </pre>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <h3 style={{ margin: 0 }}>Geometry (WKT)</h3>
+            {data.geomWkt && (
+              <button className="btn btn-sm" onClick={onCopyWkt} title="Copy WKT">
+                Copy
+              </button>
+            )}
+          </div>
+          <pre>{data.geomWkt ?? "(empty)"}</pre>
 
-              {canEdit && (
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setEdit(true)} disabled={loading}>
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setAskDelete(true)}
-                    style={{ color: "white", background: "crimson" }}
-                    disabled={loading}
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </>
+          {canEdit && !edit && (
+            <div className="btn-row">
+              <button className="btn btn-primary" onClick={() => setEdit(true)} disabled={loading}>Edit</button>
+              <button
+                className="btn btn-danger"
+                onClick={() => setAskDelete(true)}
+                disabled={loading}
+              >
+                Delete
+              </button>
+            </div>
           )}
 
-          {/* EDIT MODE */}
           {canEdit && edit && (
             <div style={{ display: "grid", gap: 10, maxWidth: 720 }}>
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Name</span>
                 <input
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={e => setName(e.target.value)}
                   style={{ borderColor: fieldErrs.name ? "crimson" : undefined }}
                 />
-                {fieldErrs.name && (
-                  <small style={{ color: "crimson" }}>{fieldErrs.name}</small>
-                )}
+                {fieldErrs.name && <small style={{ color: "crimson" }}>{fieldErrs.name}</small>}
               </label>
 
               <label style={{ display: "grid", gap: 4 }}>
@@ -238,26 +211,14 @@ export default function RouteDetails() {
                   type="number"
                   value={distance}
                   min={0}
-                  onChange={(e) =>
-                    setDistance(e.target.value === "" ? "" : Number(e.target.value))
-                  }
-                  style={{
-                    borderColor: fieldErrs.distanceMeters ? "crimson" : undefined,
-                  }}
+                  onChange={(e) => setDistance(e.target.value === "" ? "" : Number(e.target.value))}
+                  style={{ borderColor: fieldErrs.distanceMeters ? "crimson" : undefined }}
                 />
-                {fieldErrs.distanceMeters && (
-                  <small style={{ color: "crimson" }}>
-                    {fieldErrs.distanceMeters}
-                  </small>
-                )}
+                {fieldErrs.distanceMeters && <small style={{ color: "crimson" }}>{fieldErrs.distanceMeters}</small>}
               </label>
 
               <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
-                />
+                <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
                 Public
               </label>
 
@@ -266,16 +227,14 @@ export default function RouteDetails() {
                 <textarea
                   rows={5}
                   value={wkt}
-                  onChange={(e) => setWkt(e.target.value)}
+                  onChange={e => setWkt(e.target.value)}
                   style={{ borderColor: fieldErrs.geomWkt ? "crimson" : undefined }}
                 />
-                {fieldErrs.geomWkt && (
-                  <small style={{ color: "crimson" }}>{fieldErrs.geomWkt}</small>
-                )}
+                {fieldErrs.geomWkt && <small style={{ color: "crimson" }}>{fieldErrs.geomWkt}</small>}
               </label>
 
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={onSave} disabled={saving}>
+              <div className="btn-row">
+                <button className="btn btn-primary" onClick={onSave} disabled={saving}>
                   {saving ? (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                       <Spinner /> Saving…
@@ -284,19 +243,7 @@ export default function RouteDetails() {
                     "Save"
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    setEdit(false);
-                    setFieldErrs({});
-                    // reset to server values
-                    setName(data.name ?? "");
-                    setDistance(data.distanceMeters ?? "");
-                    setIsPublic(!!data.public);
-                    setWkt(data.geomWkt ?? "");
-                  }}
-                >
-                  Cancel
-                </button>
+                <button className="btn" onClick={() => { setEdit(false); setFieldErrs({}); }}>Cancel</button>
               </div>
             </div>
           )}
