@@ -1,3 +1,4 @@
+// frontend/src/pages/RouteDetails.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -13,6 +14,12 @@ type RouteRes = {
   geomWkt: string | null;
   ownerUsername?: string | null;
   canEdit?: boolean;
+};
+
+type FieldErrors = {
+  name?: string;
+  distanceMeters?: string;
+  geomWkt?: string;
 };
 
 export default function RouteDetails() {
@@ -31,9 +38,7 @@ export default function RouteDetails() {
   const [isPublic, setIsPublic] = useState(true);
   const [wkt, setWkt] = useState("");
   const [saving, setSaving] = useState(false);
-  const [formErr, setFormErr] = useState<string | null>(null);
-
-  // delete confirm modal
+  const [fieldErrs, setFieldErrs] = useState<FieldErrors>({});
   const [askDelete, setAskDelete] = useState(false);
 
   useEffect(() => {
@@ -58,9 +63,36 @@ export default function RouteDetails() {
 
   const canEdit = !!data?.canEdit;
 
+  function validate(): boolean {
+    const next: FieldErrors = {};
+    if (!name.trim()) next.name = "Name is required.";
+    if (distance !== "" && typeof distance === "number" && distance < 0) {
+      next.distanceMeters = "Distance must be ≥ 0.";
+    }
+    setFieldErrs(next);
+    return Object.keys(next).length === 0;
+  }
+
+  function parseServerErrors(body: string | undefined): FieldErrors | null {
+    if (!body) return null;
+    try {
+      const obj = typeof body === "string" ? JSON.parse(body) : body;
+      const src: any = obj?.errors ?? obj;
+      if (src && typeof src === "object") {
+        const fe: FieldErrors = {};
+        if (src.name) fe.name = String(src.name);
+        if (src.distanceMeters) fe.distanceMeters = String(src.distanceMeters);
+        if (src.geomWkt) fe.geomWkt = String(src.geomWkt);
+        return Object.keys(fe).length ? fe : null;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
   async function onSave() {
-    setFormErr(null);
-    if (!name.trim()) { setFormErr("Name is required."); return; }
+    if (!validate()) return;
     try {
       setSaving(true);
       const body: any = {
@@ -72,11 +104,19 @@ export default function RouteDetails() {
       const updated = await api.put<RouteRes>(`/api/routes/${id}`, body);
       setData(updated);
       setEdit(false);
+      setFieldErrs({});
       push({ variant: "success", title: "Saved", message: "Route updated." });
     } catch (e: any) {
-      const msg = e?.body || e?.message || "Update failed.";
-      setFormErr(typeof msg === "string" ? msg : "Update failed.");
-      push({ variant: "error", title: "Update failed", message: String(msg) });
+      const fe = parseServerErrors(e?.body);
+      if (fe) {
+        setFieldErrs(fe);
+      } else {
+        push({
+          variant: "error",
+          title: "Update failed",
+          message: String(e?.body || e?.message || "Unknown error"),
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -85,13 +125,30 @@ export default function RouteDetails() {
   async function confirmDelete() {
     try {
       await api.delete<void>(`/api/routes/${id}`);
-      push({ variant: "success", title: "Deleted", message: `Route "${data?.name ?? id}" deleted.` });
+      push({
+        variant: "success",
+        title: "Deleted",
+        message: `Route "${data?.name ?? id}" deleted.`,
+      });
       navigate("/routes/mine");
     } catch (e: any) {
-      const msg = e?.body || e?.message || "Delete failed.";
-      push({ variant: "error", title: "Delete failed", message: String(msg) });
+      push({
+        variant: "error",
+        title: "Delete failed",
+        message: String(e?.body || e?.message || "Unknown error"),
+      });
     } finally {
       setAskDelete(false);
+    }
+  }
+
+  async function onCopyWkt() {
+    if (!data?.geomWkt) return;
+    try {
+      await navigator.clipboard.writeText(data.geomWkt);
+      push({ variant: "success", title: "Copied", message: "Copied WKT to clipboard." });
+    } catch {
+      push({ variant: "error", title: "Copy failed", message: "Couldn’t access clipboard." });
     }
   }
 
@@ -116,31 +173,63 @@ export default function RouteDetails() {
       ) : data ? (
         <>
           <h2>Route — {data.name || "(unknown)"}</h2>
-          <div><strong>Distance:</strong> {distanceLabel} {data.public ? "(public)" : "(private)"}</div>
-          <div><strong>ID:</strong> {data.id}</div>
+          <div>
+            <strong>Distance:</strong> {distanceLabel}{" "}
+            {data.public ? "(public)" : "(private)"}
+          </div>
+          <div>
+            <strong>ID:</strong> {data.id}
+          </div>
 
-          <h3>Geometry (WKT)</h3>
-          <pre style={{ background: "#f6f6f6", padding: 8 }}>
-            {data.geomWkt ?? "(empty)"}
-          </pre>
+          {/* VIEW MODE */}
+          {!edit && (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ margin: 0 }}>Geometry (WKT)</h3>
+                {data.geomWkt && (
+                  <button
+                    onClick={onCopyWkt}
+                    title="Copy WKT"
+                    style={{ padding: "4px 8px", fontSize: 12, cursor: "pointer" }}
+                  >
+                    Copy
+                  </button>
+                )}
+              </div>
+              <pre style={{ background: "#f6f6f6", padding: 8 }}>
+                {data.geomWkt ?? "(empty)"}
+              </pre>
 
-          {canEdit && !edit && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setEdit(true)}>Edit</button>
-              <button
-                onClick={() => setAskDelete(true)}
-                style={{ color: "white", background: "crimson" }}
-              >
-                Delete
-              </button>
-            </div>
+              {canEdit && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setEdit(true)} disabled={loading}>
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setAskDelete(true)}
+                    style={{ color: "white", background: "crimson" }}
+                    disabled={loading}
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
+          {/* EDIT MODE */}
           {canEdit && edit && (
             <div style={{ display: "grid", gap: 10, maxWidth: 720 }}>
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Name</span>
-                <input value={name} onChange={e => setName(e.target.value)} />
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{ borderColor: fieldErrs.name ? "crimson" : undefined }}
+                />
+                {fieldErrs.name && (
+                  <small style={{ color: "crimson" }}>{fieldErrs.name}</small>
+                )}
               </label>
 
               <label style={{ display: "grid", gap: 4 }}>
@@ -149,32 +238,69 @@ export default function RouteDetails() {
                   type="number"
                   value={distance}
                   min={0}
-                  onChange={(e) => setDistance(e.target.value === "" ? "" : Number(e.target.value))}
+                  onChange={(e) =>
+                    setDistance(e.target.value === "" ? "" : Number(e.target.value))
+                  }
+                  style={{
+                    borderColor: fieldErrs.distanceMeters ? "crimson" : undefined,
+                  }}
                 />
+                {fieldErrs.distanceMeters && (
+                  <small style={{ color: "crimson" }}>
+                    {fieldErrs.distanceMeters}
+                  </small>
+                )}
               </label>
 
               <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                />
                 Public
               </label>
 
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Geometry (WKT)</span>
-                <textarea rows={5} value={wkt} onChange={e => setWkt(e.target.value)} />
+                <textarea
+                  rows={5}
+                  value={wkt}
+                  onChange={(e) => setWkt(e.target.value)}
+                  style={{ borderColor: fieldErrs.geomWkt ? "crimson" : undefined }}
+                />
+                {fieldErrs.geomWkt && (
+                  <small style={{ color: "crimson" }}>{fieldErrs.geomWkt}</small>
+                )}
               </label>
-
-              {formErr && <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{formErr}</div>}
 
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={onSave} disabled={saving}>
-                  {saving ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Spinner /> Saving…</span> : "Save"}
+                  {saving ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                      <Spinner /> Saving…
+                    </span>
+                  ) : (
+                    "Save"
+                  )}
                 </button>
-                <button onClick={() => setEdit(false)}>Cancel</button>
+                <button
+                  onClick={() => {
+                    setEdit(false);
+                    setFieldErrs({});
+                    // reset to server values
+                    setName(data.name ?? "");
+                    setDistance(data.distanceMeters ?? "");
+                    setIsPublic(!!data.public);
+                    setWkt(data.geomWkt ?? "");
+                  }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}
 
-          {/* Delete confirmation modal */}
           <Confirm
             open={askDelete}
             title="Delete route?"
