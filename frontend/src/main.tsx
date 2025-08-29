@@ -1,10 +1,12 @@
+// frontend/src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider, Outlet, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
 import "./index.css";
 
 import Navbar from "./components/Navbar";
 import RequireAuth from "./components/RequireAuth";
+import { ToastProvider } from "./components/Toasts"; // ✅ new import
 
 import Home from "./pages/Home";
 import PublicRoutes from "./pages/PublicRoutes";
@@ -33,13 +35,12 @@ const router = createBrowserRouter([
       </div>
     ),
     children: [
-      // Home
       { index: true, element: <Home /> },
 
       // Public list is at /routes
       { path: "routes", element: <PublicRoutes /> },
 
-      // Protected pages
+      // Protected routes under /routes/mine and /create
       {
         element: <RequireAuth />,
         children: [
@@ -54,10 +55,6 @@ const router = createBrowserRouter([
       // Auth
       { path: "login", element: <Login /> },
 
-      // --- Optional back-compat redirects (old paths) ---
-      { path: "public", element: <Navigate to="/routes" replace /> },
-      { path: "mine", element: <Navigate to="/routes/mine" replace /> },
-
       // 404
       { path: "*", element: <div style={{ padding: 16 }}>Not found.</div> },
     ],
@@ -66,6 +63,9 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    {/* ✅ Wrap everything in ToastProvider so toasts work app-wide */}
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
   </React.StrictMode>
 );

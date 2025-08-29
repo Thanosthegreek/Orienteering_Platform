@@ -1,37 +1,31 @@
-// frontend/src/pages/CreateRoute.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "../lib/api";
+import { useToast } from "../components/Toasts";
+import { Spinner, Skeleton } from "../components/Loading";
 
-/* ---------------- helpers ---------------- */
-type LatLng = [number, number]; // [lat, lng]
+// --- local helpers ---
+type LatLng = [number, number];
 
-// strip optional SRID=4326; prefix
 function stripSrid(wkt: string): string {
   return wkt.replace(/^SRID=\d+\s*;\s*/i, "").trim();
 }
-
-// parse "LINESTRING(x y, x y, ...)" where x=lon, y=lat -> Leaflet [lat,lng]
 function parseLineString(wkt: string): LatLng[] {
   const m = wkt.match(/^LINESTRING\s*\((.+)\)$/i);
   if (!m) throw new Error("Not a LINESTRING WKT");
   return m[1]
     .split(",")
-    .map((s) => s.trim())
-    .map((pair) => {
+    .map(s => s.trim())
+    .map(pair => {
       const [xStr, yStr] = pair.split(/\s+/);
       const lon = Number(xStr);
       const lat = Number(yStr);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        throw new Error("Invalid coordinate in WKT");
-      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("Invalid coordinate in WKT");
       return [lat, lon] as LatLng;
     });
 }
-
-// rough haversine distance (meters) over polyline
 function lengthMeters(path: LatLng[]): number {
   if (path.length < 2) return 0;
   const R = 6371000;
@@ -39,20 +33,21 @@ function lengthMeters(path: LatLng[]): number {
   for (let i = 1; i < path.length; i++) {
     const [lat1, lon1] = path[i - 1];
     const [lat2, lon2] = path[i];
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     sum += R * c;
   }
   return sum;
 }
-/* ----------------------------------------- */
 
 export default function CreateRoute() {
   const navigate = useNavigate();
+  const { push } = useToast();
 
   const [name, setName] = useState("");
   const [distanceMeters, setDistanceMeters] = useState<number | "">("");
@@ -62,8 +57,8 @@ export default function CreateRoute() {
   const [cleanWkt, setCleanWkt] = useState("");
   const [path, setPath] = useState<LatLng[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // live-parse WKT as user types
   useEffect(() => {
     const raw = (wktInput || "").trim();
     if (!raw) {
@@ -90,14 +85,10 @@ export default function CreateRoute() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) {
-      alert("Please enter a name.");
-      return;
-    }
-    if (!cleanWkt) {
-      alert("Please provide a valid LINESTRING WKT.");
-      return;
-    }
+    // inline validation
+    if (!name.trim()) { setParseError("Name is required."); return; }
+    if (!cleanWkt) { setParseError("Please provide a valid LINESTRING WKT."); return; }
+
     const dist =
       typeof distanceMeters === "number" && distanceMeters > 0
         ? distanceMeters
@@ -106,28 +97,17 @@ export default function CreateRoute() {
         : 0;
 
     try {
-      const body = {
-        name: name.trim(),
-        distanceMeters: dist,
-        public: isPublic,
-        geomWkt: cleanWkt, // backend expects plain LINESTRING (no SRID)
-      };
+      setSubmitting(true);
+      const body = { name: name.trim(), distanceMeters: dist, public: isPublic, geomWkt: cleanWkt };
       const res = await api.post<{ id: number }>("/api/routes", body);
-
-      // <-- IMPORTANT: include geomWkt in navigation state
-      navigate(`/routes/${res.id}`, {
-        state: {
-          route: {
-            id: res.id,
-            name,
-            distanceMeters: dist,
-            public: isPublic,
-            geomWkt: cleanWkt,
-          },
-        },
-      });
+      push({ variant: "success", title: "Created", message: `Route "${name}" created.` });
+      navigate(`/routes/${res.id}`);
     } catch (err: any) {
-      alert(`Create failed: ${err?.message ?? "Unknown error"}`);
+      const msg = err?.body || err?.message || "Create failed.";
+      setParseError(typeof msg === "string" ? msg : "Create failed.");
+      push({ variant: "error", title: "Create failed", message: String(msg) });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -140,7 +120,7 @@ export default function CreateRoute() {
           <span>Name</span>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={e => setName(e.target.value)}
             placeholder="Morning Loop"
             style={{ padding: 8 }}
           />
@@ -152,7 +132,7 @@ export default function CreateRoute() {
             <input
               type="number"
               value={distanceMeters}
-              onChange={(e) => setDistanceMeters(e.target.value === "" ? "" : Number(e.target.value))}
+              onChange={e => setDistanceMeters(e.target.value === "" ? "" : Number(e.target.value))}
               placeholder={estimate ? String(estimate) : "e.g. 1200"}
               style={{ padding: 8 }}
               min={0}
@@ -160,7 +140,11 @@ export default function CreateRoute() {
           </label>
 
           <label style={{ alignSelf: "end", display: "flex", alignItems: "center", gap: 8 }}>
-            <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={e => setIsPublic(e.target.checked)}
+            />
             Public
           </label>
         </div>
@@ -178,47 +162,47 @@ export default function CreateRoute() {
           <span>Geometry (WKT)</span>
           <textarea
             value={wktInput}
-            onChange={(e) => setWktInput(e.target.value)}
+            onChange={e => setWktInput(e.target.value)}
             placeholder="LINESTRING(23.721 37.983, 23.723 37.985)"
             rows={5}
             style={{ padding: 8, fontFamily: "monospace" }}
           />
         </label>
-        {parseError && <div style={{ color: "crimson" }}>WKT error: {parseError}</div>}
 
-        <button type="submit" disabled={!name.trim() || !cleanWkt || !!parseError}>
-          Create
+        {parseError && <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{parseError}</div>}
+
+        <button type="submit" disabled={submitting || !name.trim() || !cleanWkt || !!parseError}>
+          {submitting ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Spinner /> Creating…</span> : "Create"}
         </button>
       </form>
 
       {/* Map preview */}
-      {center && path.length >= 2 && (
+      {center && path.length >= 2 ? (
         <div style={{ height: 420 }}>
           <PreviewMap center={center} path={path} />
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          <Skeleton height={18} width="40%" />
+          <Skeleton height={220} />
         </div>
       )}
     </div>
   );
 }
 
-/* ----------------- map preview ----------------- */
-function PreviewMap({ center, path }: { center: LatLng; path: LatLng[] }) {
+function PreviewMap({ center, path }: { center: [number, number]; path: [number, number][] }) {
   return (
     <MapContainer center={center} zoom={15} style={{ height: "100%", width: "100%" }}>
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       <Polyline positions={path} />
-      <Marker position={path[0]}>
-        <Popup>Start</Popup>
-      </Marker>
-      <Marker position={path[path.length - 1]}>
-        <Popup>Finish</Popup>
-      </Marker>
+      <Marker position={path[0]}><Popup>Start</Popup></Marker>
+      <Marker position={path[path.length - 1]}><Popup>Finish</Popup></Marker>
       <FitBounds positions={path} />
     </MapContainer>
   );
 }
-
-function FitBounds({ positions }: { positions: LatLng[] }) {
+function FitBounds({ positions }: { positions: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
     if (positions.length >= 2) {

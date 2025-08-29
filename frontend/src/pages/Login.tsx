@@ -1,51 +1,64 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { setToken } from "../lib/auth";
-import { useNavigate, Link } from "react-router-dom";
+import { useToast } from "../components/Toasts";
+import { Spinner } from "../components/Loading";
 
 export default function Login() {
-  const [email, setEmail] = useState("hiker2501@example.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const nav = useNavigate();
+  const location = useLocation();
+  const { push } = useToast();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    setBusy(true);
+    setError(null);
+
+    if (!email.trim() || !password) {
+      setError("Email and password are required.");
+      return;
+    }
+
     try {
-      // Expect { token, email?, role? }
-      const res = await api.post<{ token: string; email?: string; role?: string }>(
-        "/api/auth/login",
-        { email, password }
-      );
-      if (!res?.token) throw new Error("No token in response");
+      setSubmitting(true);
+      const res = await api.post<{ token: string }>("/api/auth/login", { email: email.trim(), password });
       setToken(res.token);
-      navigate("/"); // go home (or wherever)
-    } catch (e: any) {
-      setErr(e?.body || e?.message || "Login failed");
+      push({ variant: "success", title: "Welcome!", message: "Login successful." });
+      const next = (location.state as any)?.from || "/routes/mine";
+      nav(next, { replace: true });
+    } catch (err: any) {
+      const msg = err?.body || err?.message || "Login failed.";
+      setError(typeof msg === "string" ? msg : "Login failed.");
+      push({ variant: "error", title: "Login failed", message: String(msg) });
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 420 }}>
-      <p><Link to="/">Home</Link> · <Link to="/routes">Public</Link></p>
-      <h1>Login</h1>
-      <form onSubmit={onSubmit}>
-        <div style={{ marginBottom: 8 }}>
-          <label>Email</label><br />
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-        </div>
-        <div style={{ marginBottom: 8 }}>
-          <label>Password</label><br />
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-        </div>
-        <button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+    <div style={{ maxWidth: 420, margin: "40px auto", display: "grid", gap: 12 }}>
+      <h2>Login</h2>
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
+        <label style={{ display: "grid", gap: 4 }}>
+          <span>Email</span>
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+        </label>
+        <label style={{ display: "grid", gap: 4 }}>
+          <span>Password</span>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+        </label>
+
+        {error && <div style={{ color: "crimson", whiteSpace: "pre-wrap" }}>{error}</div>}
+
+        <button type="submit" disabled={submitting} style={{ padding: "8px 12px" }}>
+          {submitting ? <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Spinner /> Signing in…</span> : "Login"}
+        </button>
       </form>
-      {err && <p style={{ color: "crimson", marginTop: 8 }}>{err}</p>}
     </div>
   );
 }
