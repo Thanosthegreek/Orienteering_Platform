@@ -1,13 +1,14 @@
-import { Link } from "react-router-dom";
+// frontend/src/pages/Home.tsx
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { getToken, removeToken } from "../lib/auth";
+import WeatherCard from "../components/WeatherCard";
 
 export default function Home() {
   const [email, setEmail] = useState<string | null>(null);
-  const [now, setNow] = useState<Date>(new Date());
 
-  // fetch email for greeting in the hero header
+  // Load greeting from /api/auth/me if a token exists
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -23,52 +24,30 @@ export default function Home() {
         if (!cancelled) setEmail(null);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // clock tick
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const dateStr = new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(now);
-
-  const timeStr = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: true,
-  }).format(now);
+  function logout() {
+    removeToken();
+    location.assign("/login");
+  }
 
   return (
     <div className="home-shell">
-      {/* Full-width orange header */}
-      <header className="home-hero">
+      {/* Orange hero header */}
+      <div className="home-hero">
         <div className="home-hero-bar">
-          <Link to="/" className="btn btn-ghost brand big">Orienteering</Link>
-          <div className="spacer" />
-          {email ? (
-            <div className="hero-right">
-              <span className="muted">Hi, {email}</span>
-              <button
-                className="btn btn-sm"
-                onClick={() => {
-                  removeToken();
-                  location.assign("/login");
-                }}
-              >
+          <span className="brand">Orienteering</span>
+          <div style={{ flex: 1 }} />
+          {email && (
+            <>
+              <span>Hi, {email}</span>
+              <button onClick={logout} className="btn btn-sm btn-danger">
                 Logout
               </button>
-            </div>
-          ) : (
-            <div className="hero-right">
-              <Link to="/login" className="btn btn-sm">Login</Link>
-              <Link to="/register" className="btn btn-sm btn-primary">Register</Link>
-            </div>
+            </>
           )}
         </div>
 
@@ -76,33 +55,41 @@ export default function Home() {
         <p className="home-sub">Create, explore, and share running routes.</p>
 
         <div className="home-cta">
-          <Link to="/routes" className="btn btn-lg btn-primary">Public Routes</Link>
-          <Link to="/routes/mine" className="btn btn-lg">My Routes</Link>
-          <Link to="/create" className="btn btn-lg btn-success">Create</Link>
+          <Link to="/routes" className="btn btn-primary">Public Routes</Link>
+          <Link to="/routes/mine" className="btn btn-success">My Routes</Link>
+          <Link to="/create" className="btn btn-accent">Create</Link>
         </div>
-      </header>
+      </div>
 
-      {/* Full-width content with diagonal + bold frame */}
-      <main className="home-content">
-        <section className="card card-tight">
-          <h3>Weather forecast</h3>
-          <p className="muted">(Weather analysis / predictions will appear here…)</p>
-        </section>
+      {/* Blue / grey diagonal background content */}
+      <div className="home-content">
+        <div style={{ padding: 16 }}>
+          <WeatherCard />
+        </div>
 
-        <section className="card card-tight">
-          <h3>Quick start</h3>
-          <ul className="disc">
-            <li>Paste a <strong>LINESTRING WKT</strong> and preview it on the map.</li>
-            <li>See an estimated distance and save your route.</li>
-            <li>Keep routes private or mark them public.</li>
-          </ul>
-        </section>
-
+        {/* Stamps (date + clock) pinned to bottom corners */}
         <div className="home-stamps">
-          <div className="stamp-left">{dateStr}</div>
-          <div className="stamp-right">{timeStr}</div>
+          <div className="stamp-left">
+            {new Date().toLocaleDateString(undefined, {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </div>
+          <Clock className="stamp-right" />
         </div>
-      </main>
+      </div>
     </div>
   );
+}
+
+/* Simple live clock */
+function Clock({ className }: { className?: string }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <div className={className}>{now.toLocaleTimeString()}</div>;
 }
