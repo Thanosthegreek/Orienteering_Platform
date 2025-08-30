@@ -1,4 +1,3 @@
-// frontend/src/pages/CreateRoute.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
@@ -7,7 +6,7 @@ import { api } from "../lib/api";
 import { useToasts } from "../components/ToastContext";
 import { Spinner } from "../components/Loading";
 
-// --- local helpers ---
+// --- local helpers (kept here so we don't depend on anything else) ---
 type LatLng = [number, number]; // [lat, lng]
 
 // strip optional SRID=4326; prefix
@@ -53,7 +52,7 @@ function lengthMeters(path: LatLng[]): number {
   }
   return sum;
 }
-// ----------------------
+// --------------------------------------------------------------------
 
 type FieldErrors = {
   name?: string;

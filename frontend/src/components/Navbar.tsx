@@ -1,9 +1,14 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { getToken, removeToken } from "../lib/auth";
 
 export default function Navbar() {
+  const { pathname } = useLocation();
+
+  // Hide the global topbar on the Home route (we render a custom header inside Home)
+  if (pathname === "/") return null;
+
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,17 +32,18 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
-      <Link to="/" className="btn btn-ghost">Home</Link>
-      <Link to="/routes" className="btn btn-ghost">Public</Link>
+    <nav className="topbar">
+      <div className="topbar-left">
+        <Link to="/" className="btn btn-ghost brand">Orienteering</Link>
+      </div>
+
+      <div className="topbar-spacer" />
 
       {email ? (
-        <>
-          <Link to="/routes/mine" className="btn btn-ghost">My routes</Link>
-          <Link to="/create" className="btn btn-ghost">Create</Link>
-          <span style={{ marginLeft: "auto", color: "#6b7280" }}>Hi, {email}</span>
+        <div className="topbar-right">
+          <span className="muted">Hi, {email}</span>
           <button
-            className="btn"
+            className="btn btn-sm"
             onClick={() => {
               removeToken();
               location.assign("/login");
@@ -45,13 +51,12 @@ export default function Navbar() {
           >
             Logout
           </button>
-        </>
+        </div>
       ) : (
-        <>
-          <div style={{ marginLeft: "auto" }} />
-          <Link to="/login" className="btn">Login</Link>
-          <Link to="/register" className="btn btn-primary">Register</Link>
-        </>
+        <div className="topbar-right">
+          <Link to="/login" className="btn btn-sm">Login</Link>
+          <Link to="/register" className="btn btn-sm btn-primary">Register</Link>
+        </div>
       )}
     </nav>
   );

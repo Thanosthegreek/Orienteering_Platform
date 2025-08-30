@@ -1,4 +1,3 @@
-// frontend/src/pages/Mine.tsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -32,23 +31,27 @@ export default function Mine() {
 
   return (
     <div style={{ padding: 16 }}>
-      <h2>My routes</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <h2 style={{ margin: 0 }}>My routes</h2>
+        <Link to="/create" className="btn btn-primary">New route</Link>
+      </div>
+
       {loading ? (
         <>
-          <Skeleton height={48} />
-          <Skeleton height={48} />
-          <Skeleton height={48} />
+          <Skeleton height={58} />
+          <Skeleton height={58} />
+          <Skeleton height={58} />
         </>
       ) : err ? (
         <div style={{ color: "crimson" }}>{err}</div>
       ) : !items.length ? (
-        <p style={{ color: "#777" }}>(none)</p>
+        <p style={{ color: "#777" }}>(none yet)</p>
       ) : (
         <ul className="route-list">
           {items.map(r => (
             <li key={r.id} className="route-item">
               <div style={{ display: "grid", gap: 2 }}>
-                <Link to={`/routes/${r.id}`} style={{ fontWeight: 600 }}>
+                <Link to={`/routes/${r.id}`} style={{ fontWeight: 700, textDecoration: "none", color: "inherit" }}>
                   {r.name}
                 </Link>
                 <div className="route-meta">

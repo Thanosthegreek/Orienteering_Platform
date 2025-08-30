@@ -1,4 +1,3 @@
-// frontend/src/pages/RouteDetails.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
@@ -84,7 +83,7 @@ export default function RouteDetails() {
         if (src.geomWkt) fe.geomWkt = String(src.geomWkt);
         return Object.keys(fe).length ? fe : null;
       }
-    } catch { /* ignore */ }
+    } catch {}
     return null;
   }
 
@@ -183,11 +182,7 @@ export default function RouteDetails() {
           {canEdit && !edit && (
             <div className="btn-row">
               <button className="btn btn-primary" onClick={() => setEdit(true)} disabled={loading}>Edit</button>
-              <button
-                className="btn btn-danger"
-                onClick={() => setAskDelete(true)}
-                disabled={loading}
-              >
+              <button className="btn btn-danger" onClick={() => setAskDelete(true)} disabled={loading}>
                 Delete
               </button>
             </div>
