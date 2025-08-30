@@ -18,7 +18,6 @@ export default function Navbar() {
         const me = await api.get<{ email: string }>("/api/auth/me");
         if (!cancelled) setEmail(me.email);
       } catch {
-        // If /auth/me fails (e.g., token expired), just show signed-out UI.
         if (!cancelled) setEmail(null);
       }
     })();
@@ -28,18 +27,17 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav style={{ display: "flex", gap: 12 }}>
-      <Link to="/">Home</Link>
-      {/* Public list */}
-      <Link to="/routes">Public</Link>
+    <nav style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
+      <Link to="/" className="btn btn-ghost">Home</Link>
+      <Link to="/routes" className="btn btn-ghost">Public</Link>
 
       {email ? (
         <>
-          {/* Protected list of the current user's routes */}
-          <Link to="/routes/mine">My routes</Link>
-          <Link to="/create">Create</Link>
-          <span>Hi, {email}</span>
+          <Link to="/routes/mine" className="btn btn-ghost">My routes</Link>
+          <Link to="/create" className="btn btn-ghost">Create</Link>
+          <span style={{ marginLeft: "auto", color: "#6b7280" }}>Hi, {email}</span>
           <button
+            className="btn"
             onClick={() => {
               removeToken();
               location.assign("/login");
@@ -49,7 +47,11 @@ export default function Navbar() {
           </button>
         </>
       ) : (
-        <Link to="/login">Login</Link>
+        <>
+          <div style={{ marginLeft: "auto" }} />
+          <Link to="/login" className="btn">Login</Link>
+          <Link to="/register" className="btn btn-primary">Register</Link>
+        </>
       )}
     </nav>
   );

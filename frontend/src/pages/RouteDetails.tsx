@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
-import { useToast } from "../components/Toasts";
+import { useToasts } from "../components/ToastContext";
 import { Skeleton, Spinner } from "../components/Loading";
 import Confirm from "../components/Confirm";
 
@@ -26,7 +26,7 @@ export default function RouteDetails() {
   const { id } = useParams<{ id: string }>();
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { push } = useToast();
+  const { push } = useToasts();
 
   const [data, setData] = useState<RouteRes | null>(null);
   const [loading, setLoading] = useState(true);

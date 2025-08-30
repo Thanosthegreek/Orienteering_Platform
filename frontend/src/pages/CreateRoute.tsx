@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "../lib/api";
-import { useToast } from "../components/Toasts";
+import { useToasts } from "../components/ToastContext";
 import { Spinner } from "../components/Loading";
 
 // --- local helpers ---
@@ -63,7 +63,7 @@ type FieldErrors = {
 
 export default function CreateRoute() {
   const navigate = useNavigate();
-  const { push } = useToast();
+  const { push } = useToasts();
 
   const [name, setName] = useState("");
   const [distanceMeters, setDistanceMeters] = useState<number | "">("");

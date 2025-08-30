@@ -6,13 +6,17 @@ import "./index.css";
 
 import Navbar from "./components/Navbar";
 import RequireAuth from "./components/RequireAuth";
-import { ToastProvider } from "./components/Toasts"; // ✅ new import
+
+// 🔔 Toasts
+import { ToastProvider } from "./components/ToastContext";
+import Toasts from "./components/Toasts";
 
 import Home from "./pages/Home";
 import PublicRoutes from "./pages/PublicRoutes";
 import Mine from "./pages/Mine";
 import CreateRoute from "./pages/CreateRoute";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import RouteDetails from "./pages/RouteDetails";
 
 function Layout() {
@@ -36,11 +40,8 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Home /> },
-
-      // Public list is at /routes
       { path: "routes", element: <PublicRoutes /> },
 
-      // Protected routes under /routes/mine and /create
       {
         element: <RequireAuth />,
         children: [
@@ -49,11 +50,11 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Route details
       { path: "routes/:id", element: <RouteDetails /> },
 
       // Auth
       { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
 
       // 404
       { path: "*", element: <div style={{ padding: 16 }}>Not found.</div> },
@@ -63,9 +64,10 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {/* ✅ Wrap everything in ToastProvider so toasts work app-wide */}
     <ToastProvider>
       <RouterProvider router={router} />
+      {/* Overlay that actually renders the toasts */}
+      <Toasts />
     </ToastProvider>
   </React.StrictMode>
 );

@@ -3,13 +3,12 @@ package com.orienteering.dto;
 public class RegisterReq {
     private String email;
     private String password;
-    private String role; // "USER" or "ADMIN"
 
     public RegisterReq() {}
-    public RegisterReq(String email, String password, String role) {
+
+    public RegisterReq(String email, String password) {
         this.email = email;
         this.password = password;
-        this.role = role;
     }
 
     public String getEmail() { return email; }
@@ -17,7 +16,4 @@ public class RegisterReq {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
-
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
 }

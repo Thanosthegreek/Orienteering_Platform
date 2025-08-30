@@ -1,16 +1,16 @@
 // src/main/java/com/orienteering/config/JwtAuthFilter.java
 package com.orienteering.config;
 
-import com.orienteering.config.JwtService; // adjust import if your JwtService is elsewhere
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -24,43 +24,60 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    // explicit constructor instead of @RequiredArgsConstructor
     public JwtAuthFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain chain
     ) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
-
-            try {
-                String email = jwtService.extractUsername(token);   // "sub"
-                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // If you stored a role claim in the token, you can pull it too:
-                    String role = null;
-                    try { role = jwtService.extractRole(token); } catch (Exception ignored) {}
-
-                    List<GrantedAuthority> authorities =
-                            (role == null) ? Collections.emptyList()
-                                    : List.of(new SimpleGrantedAuthority("ROLE_" + role));
-
-                    UsernamePasswordAuthenticationToken auth =
-                            new UsernamePasswordAuthenticationToken(email, null, authorities);
-                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                }
-            } catch (JwtException ex) {
-                // Invalid/expired token -> leave context empty; downstream will 401/403 as configured
-            }
+        // Allow preflight through
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            chain.doFilter(request, response);
+            return;
         }
 
-        filterChain.doFilter(request, response);
+        String uri = request.getRequestURI();
+        // Only bypass JWT processing for login/register.
+        if ("/api/auth/login".equals(uri) || "/api/auth/register".equals(uri)) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (header == null || !header.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        String token = header.substring(7);
+        try {
+            String username = jwtService.extractUsername(token);
+            boolean valid = (username != null) && jwtService.isValid(token, username);
+
+            if (valid && SecurityContextHolder.getContext().getAuthentication() == null) {
+                String role = jwtService.extractRole(token); // may be null
+                List<SimpleGrantedAuthority> auths = (role != null && !role.isBlank())
+                        ? List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                        : Collections.emptyList();
+
+                var principal = User.withUsername(username)
+                        .password("") // unused
+                        .authorities(auths)
+                        .build();
+
+                var auth = new UsernamePasswordAuthenticationToken(principal, null, auths);
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
+        } catch (Exception ignored) {
+            // swallow; protected endpoints will still 401/403 as needed
+        }
+
+        chain.doFilter(request, response);
     }
 }
