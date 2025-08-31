@@ -42,15 +42,14 @@ async function request<T = any>(method: HttpMethod, path: string, body?: any): P
       text = contentType.includes("application/json")
         ? JSON.stringify(await res.json())
         : await res.text();
-    } catch {}
+    } catch {
+      // ignore parse errors
+    }
 
-    // IMPORTANT: only clear token on 401 (unauthenticated).
-    // 403 may mean "you are authenticated but not allowed" — do not log the user out.
+    // ✅ Only clear token on 401; do NOT auto-redirect.
+    // 403 may mean "authenticated but not allowed" — do not log the user out.
     if (res.status === 401) {
       removeToken();
-      if (location.pathname !== "/login") {
-        location.assign("/login");
-      }
     }
 
     const err: any = new Error(`HTTP ${res.status}`);

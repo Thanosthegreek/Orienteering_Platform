@@ -32,7 +32,7 @@ export default function Login() {
     if (!password) e.password = "Password is required.";
     setFieldErrs(e);
     return Object.keys(e).length === 0;
-    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -122,8 +122,14 @@ export default function Login() {
         </div>
       </form>
 
+      {/* Footer with register link */}
       <div style={{ color: "#6b7280", fontSize: ".9rem" }}>
-        Don’t have an account? You can still explore <Link to="/routes">public routes</Link>.
+        Don’t have an account?{" "}
+        <Link to="/register" state={{ from }}>
+          Create one
+        </Link>
+        . You can still explore{" "}
+        <Link to="/routes">public routes</Link>.
       </div>
     </div>
   );

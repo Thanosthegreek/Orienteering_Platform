@@ -15,11 +15,7 @@ type RouteRes = {
   canEdit?: boolean;
 };
 
-type FieldErrors = {
-  name?: string;
-  distanceMeters?: string;
-  geomWkt?: string;
-};
+type FieldErrors = { name?: string; distanceMeters?: string; geomWkt?: string };
 
 export default function RouteDetails() {
   const { id } = useParams<{ id: string }>();
@@ -31,7 +27,6 @@ export default function RouteDetails() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // edit state
   const [edit, setEdit] = useState<boolean>(!!(state as any)?.edit);
   const [name, setName] = useState("");
   const [distance, setDistance] = useState<number | "">("");
@@ -47,7 +42,6 @@ export default function RouteDetails() {
         setLoading(true);
         const r = await api.get<RouteRes>(`/api/routes/${id}`);
         setData(r);
-        // seed form
         setName(r.name ?? "");
         setDistance(r.distanceMeters ?? "");
         setIsPublic(!!r.public);
@@ -104,11 +98,8 @@ export default function RouteDetails() {
       push({ variant: "success", title: "Saved", message: "Route updated." });
     } catch (e: any) {
       const fe = parseServerErrors(e?.body);
-      if (fe) {
-        setFieldErrs(fe);
-      } else {
-        push({ variant: "error", title: "Update failed", message: String(e?.body || e?.message || "Unknown error") });
-      }
+      if (fe) setFieldErrs(fe);
+      else push({ variant: "error", title: "Update failed", message: String(e?.body || e?.message || "Unknown error") });
     } finally {
       setSaving(false);
     }
@@ -143,7 +134,10 @@ export default function RouteDetails() {
 
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
-      <Link to={canEdit ? "/routes/mine" : "/routes"} className="btn btn-ghost">← Back</Link>
+      {/* NEW Back button */}
+      <div className="btn-row">
+        <Link to="/routes/mine" className="btn btn-ghost">← Back to My Routes</Link>
+      </div>
 
       {loading ? (
         <>
@@ -172,9 +166,7 @@ export default function RouteDetails() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
             <h3 style={{ margin: 0 }}>Geometry (WKT)</h3>
             {data.geomWkt && (
-              <button className="btn btn-sm" onClick={onCopyWkt} title="Copy WKT">
-                Copy
-              </button>
+              <button className="btn btn-sm" onClick={onCopyWkt} title="Copy WKT">Copy</button>
             )}
           </div>
           <pre>{data.geomWkt ?? "(empty)"}</pre>
@@ -182,9 +174,7 @@ export default function RouteDetails() {
           {canEdit && !edit && (
             <div className="btn-row">
               <button className="btn btn-primary" onClick={() => setEdit(true)} disabled={loading}>Edit</button>
-              <button className="btn btn-danger" onClick={() => setAskDelete(true)} disabled={loading}>
-                Delete
-              </button>
+              <button className="btn btn-danger" onClick={() => setAskDelete(true)} disabled={loading}>Delete</button>
             </div>
           )}
 
@@ -192,23 +182,15 @@ export default function RouteDetails() {
             <div style={{ display: "grid", gap: 10, maxWidth: 720 }}>
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Name</span>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  style={{ borderColor: fieldErrs.name ? "crimson" : undefined }}
-                />
+                <input value={name} onChange={e => setName(e.target.value)} style={{ borderColor: fieldErrs.name ? "crimson" : undefined }} />
                 {fieldErrs.name && <small style={{ color: "crimson" }}>{fieldErrs.name}</small>}
               </label>
 
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Distance (m)</span>
-                <input
-                  type="number"
-                  value={distance}
-                  min={0}
+                <input type="number" value={distance} min={0}
                   onChange={(e) => setDistance(e.target.value === "" ? "" : Number(e.target.value))}
-                  style={{ borderColor: fieldErrs.distanceMeters ? "crimson" : undefined }}
-                />
+                  style={{ borderColor: fieldErrs.distanceMeters ? "crimson" : undefined }} />
                 {fieldErrs.distanceMeters && <small style={{ color: "crimson" }}>{fieldErrs.distanceMeters}</small>}
               </label>
 
@@ -219,24 +201,14 @@ export default function RouteDetails() {
 
               <label style={{ display: "grid", gap: 4 }}>
                 <span>Geometry (WKT)</span>
-                <textarea
-                  rows={5}
-                  value={wkt}
-                  onChange={e => setWkt(e.target.value)}
-                  style={{ borderColor: fieldErrs.geomWkt ? "crimson" : undefined }}
-                />
+                <textarea rows={5} value={wkt} onChange={e => setWkt(e.target.value)}
+                  style={{ borderColor: fieldErrs.geomWkt ? "crimson" : undefined }} />
                 {fieldErrs.geomWkt && <small style={{ color: "crimson" }}>{fieldErrs.geomWkt}</small>}
               </label>
 
               <div className="btn-row">
                 <button className="btn btn-primary" onClick={onSave} disabled={saving}>
-                  {saving ? (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                      <Spinner /> Saving…
-                    </span>
-                  ) : (
-                    "Save"
-                  )}
+                  {saving ? (<span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Spinner /> Saving…</span>) : ("Save")}
                 </button>
                 <button className="btn" onClick={() => { setEdit(false); setFieldErrs({}); }}>Cancel</button>
               </div>

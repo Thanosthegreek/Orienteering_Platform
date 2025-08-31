@@ -1,63 +1,56 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
-import { getToken, removeToken } from "../lib/auth";
+import { removeToken } from "../lib/auth";
 
 export default function Navbar() {
-  const { pathname } = useLocation();
+  const loc = useLocation();
+  // Hide navbar on Home (we render the hero header there instead)
+  const hide = loc.pathname === "/";
 
-  // Hide the global topbar on the Home route (we render a custom header inside Home)
-  if (pathname === "/") return null;
-
-  const [email, setEmail] = useState<string | null>(null);
-
+  const [me, setMe] = useState<string | null>(null);
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
-      setEmail(null);
-      return;
-    }
-    let cancelled = false;
+    let cancel = false;
     (async () => {
       try {
-        const me = await api.get<{ email: string }>("/api/auth/me");
-        if (!cancelled) setEmail(me.email);
+        const r = await api.get<{ email: string }>("/api/auth/me");
+        if (!cancel) setMe(r?.email ?? null);
       } catch {
-        if (!cancelled) setEmail(null);
+        if (!cancel) setMe(null);
       }
     })();
     return () => {
-      cancelled = true;
+      cancel = true;
     };
-  }, []);
+  }, [loc.pathname]);
+
+  if (hide) return null;
 
   return (
-    <nav className="topbar">
+    <div className="topbar">
       <div className="topbar-left">
-        <Link to="/" className="btn btn-ghost brand">Orienteering</Link>
+        <Link to="/" className="btn btn-nav btn-ghost brand">
+          Orienteering
+        </Link>
+        <Link to="/routes" className="btn btn-nav btn-public">Public</Link>
+        <Link to="/routes/mine" className="btn btn-nav btn-mine">My Routes</Link>
+        <Link to="/create" className="btn btn-nav btn-create">Create</Link>
       </div>
 
       <div className="topbar-spacer" />
 
-      {email ? (
-        <div className="topbar-right">
-          <span className="muted">Hi, {email}</span>
-          <button
-            className="btn btn-sm"
-            onClick={() => {
-              removeToken();
-              location.assign("/login");
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      ) : (
-        <div className="topbar-right">
-          <Link to="/login" className="btn btn-sm">Login</Link>
-          <Link to="/register" className="btn btn-sm btn-primary">Register</Link>
-        </div>
-      )}
-    </nav>
+      <div className="topbar-right">
+        {me && <span className="muted">Hi, {me}</span>}
+        <button
+          className="btn btn-nav btn-ghost"
+          onClick={() => {
+            removeToken();
+            location.assign("/login");
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    </div>
   );
 }

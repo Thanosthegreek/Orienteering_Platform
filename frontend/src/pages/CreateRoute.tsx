@@ -6,15 +6,11 @@ import { api } from "../lib/api";
 import { useToasts } from "../components/ToastContext";
 import { Spinner } from "../components/Loading";
 
-// --- local helpers (kept here so we don't depend on anything else) ---
 type LatLng = [number, number]; // [lat, lng]
 
-// strip optional SRID=4326; prefix
 function stripSrid(wkt: string): string {
   return wkt.replace(/^SRID=\d+\s*;\s*/i, "").trim();
 }
-
-// parse "LINESTRING(x y, x y, ...)" where x=lon, y=lat -> Leaflet [lat,lng]
 function parseLineString(wkt: string): LatLng[] {
   const m = wkt.match(/^LINESTRING\s*\((.+)\)$/i);
   if (!m) throw new Error("Not a LINESTRING WKT");
@@ -25,14 +21,10 @@ function parseLineString(wkt: string): LatLng[] {
       const [xStr, yStr] = pair.split(/\s+/);
       const lon = Number(xStr);
       const lat = Number(yStr);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-        throw new Error("Invalid coordinate in WKT");
-      }
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error("Invalid coordinate in WKT");
       return [lat, lon] as LatLng;
     });
 }
-
-// rough haversine distance (meters) over polyline
 function lengthMeters(path: LatLng[]): number {
   if (path.length < 2) return 0;
   const R = 6371000;
@@ -42,17 +34,13 @@ function lengthMeters(path: LatLng[]): number {
     const [lat2, lon2] = path[i];
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const a = Math.sin(dLat/2)**2 +
+      Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     sum += R * c;
   }
   return sum;
 }
-// --------------------------------------------------------------------
 
 type FieldErrors = {
   name?: string;
@@ -76,15 +64,9 @@ export default function CreateRoute() {
   const [saving, setSaving] = useState(false);
   const [fieldErrs, setFieldErrs] = useState<FieldErrors>({});
 
-  // live-parse WKT as user types
   useEffect(() => {
     const raw = (wktInput || "").trim();
-    if (!raw) {
-      setCleanWkt("");
-      setPath([]);
-      setParseError(null);
-      return;
-    }
+    if (!raw) { setCleanWkt(""); setPath([]); setParseError(null); return; }
     try {
       const cleaned = stripSrid(raw);
       const pts = parseLineString(cleaned);
@@ -130,7 +112,7 @@ export default function CreateRoute() {
         name: name.trim(),
         distanceMeters: dist,
         public: isPublic,
-        geomWkt: cleanWkt, // backend expects plain LINESTRING
+        geomWkt: cleanWkt,
       };
       const res = await api.post<{ id: number }>("/api/routes", body);
       push({ variant: "success", title: "Created", message: "Route created successfully." });
@@ -142,18 +124,10 @@ export default function CreateRoute() {
         if (obj?.errors?.name) fe.name = String(obj.errors.name);
         if (obj?.errors?.distanceMeters) fe.distanceMeters = String(obj.errors.distanceMeters);
         if (obj?.errors?.geomWkt) fe.geomWkt = String(obj.errors.geomWkt);
-        if (Object.keys(fe).length) {
-          setFieldErrs(fe);
-        } else {
-          throw err;
-        }
+        if (Object.keys(fe).length) setFieldErrs(fe);
+        else throw err;
       } catch {
-        // fallback toast
-        push({
-          variant: "error",
-          title: "Create failed",
-          message: String(err?.body || err?.message || "Unknown error"),
-        });
+        push({ variant: "error", title: "Create failed", message: String(err?.body || err?.message || "Unknown error") });
       }
     } finally {
       setSaving(false);
@@ -162,8 +136,9 @@ export default function CreateRoute() {
 
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
+      {/* NEW Back button */}
       <div className="btn-row">
-        <Link to="/routes/mine" className="btn btn-ghost">← Back</Link>
+        <Link to="/routes/mine" className="btn btn-ghost">← Back to My Routes</Link>
       </div>
 
       <h2>Create route</h2>
@@ -197,11 +172,7 @@ export default function CreateRoute() {
           </label>
 
           <label style={{ alignSelf: "end", display: "flex", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={e => setIsPublic(e.target.checked)}
-            />
+            <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
             Public
           </label>
         </div>
@@ -234,7 +205,7 @@ export default function CreateRoute() {
           )}
         </label>
 
-        <div className="btn-row">
+        <div className="btn-row" style={{ marginTop: 4 }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -248,7 +219,6 @@ export default function CreateRoute() {
         </div>
       </form>
 
-      {/* Map preview */}
       {center && path.length >= 2 && (
         <div style={{ height: 420 }}>
           <PreviewMap center={center} path={path} />
@@ -258,7 +228,6 @@ export default function CreateRoute() {
   );
 }
 
-/* ----------------- map preview ----------------- */
 function PreviewMap({ center, path }: { center: LatLng; path: LatLng[] }) {
   return (
     <MapContainer center={center} zoom={15} style={{ height: "100%", width: "100%" }}>
@@ -270,13 +239,8 @@ function PreviewMap({ center, path }: { center: LatLng; path: LatLng[] }) {
     </MapContainer>
   );
 }
-
 function FitBounds({ positions }: { positions: LatLng[] }) {
   const map = useMap();
-  useEffect(() => {
-    if (positions.length >= 2) {
-      (map as any).fitBounds(positions, { padding: [24, 24] });
-    }
-  }, [map, positions]);
+  useEffect(() => { if (positions.length >= 2) (map as any).fitBounds(positions, { padding: [24, 24] }); }, [map, positions]);
   return null;
 }

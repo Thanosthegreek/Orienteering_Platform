@@ -1,4 +1,3 @@
-// frontend/src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
@@ -7,10 +6,11 @@ import "./index.css";
 import Navbar from "./components/Navbar";
 import RequireAuth from "./components/RequireAuth";
 
-// 🔔 Toasts
+/* Toasts */
 import { ToastProvider } from "./components/ToastContext";
 import Toasts from "./components/Toasts";
 
+/* Pages */
 import Home from "./pages/Home";
 import PublicRoutes from "./pages/PublicRoutes";
 import Mine from "./pages/Mine";
@@ -18,10 +18,11 @@ import CreateRoute from "./pages/CreateRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RouteDetails from "./pages/RouteDetails";
+import DrawBuilder from "./pages/DrawBuilder";
 
 function Layout() {
   return (
-    <div style={{ padding: 16 }}>
+    <div>
       <Navbar />
       <Outlet />
     </div>
@@ -40,6 +41,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Home /> },
+
       { path: "routes", element: <PublicRoutes /> },
 
       {
@@ -47,16 +49,15 @@ const router = createBrowserRouter([
         children: [
           { path: "routes/mine", element: <Mine /> },
           { path: "create", element: <CreateRoute /> },
+          { path: "draw", element: <DrawBuilder /> }, // ← builder route
         ],
       },
 
       { path: "routes/:id", element: <RouteDetails /> },
 
-      // Auth
       { path: "login", element: <Login /> },
       { path: "register", element: <Register /> },
 
-      // 404
       { path: "*", element: <div style={{ padding: 16 }}>Not found.</div> },
     ],
   },
@@ -66,7 +67,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <ToastProvider>
       <RouterProvider router={router} />
-      {/* Overlay that actually renders the toasts */}
       <Toasts />
     </ToastProvider>
   </React.StrictMode>
